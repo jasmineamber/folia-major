@@ -76,6 +76,13 @@ export class PlaybackListenTracker {
         return this.session?.listenedSeconds ?? 0;
     }
 
+    /** Resets the media-time baseline so a small seek cannot be counted as continuous playback. */
+    resetProgressAnchor(): void {
+        if (this.session) {
+            this.session.lastMediaTime = Number.NaN;
+        }
+    }
+
     /**
      * Folds one `timeupdate` into the accumulator.
      *

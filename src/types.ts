@@ -123,7 +123,7 @@ export type BuiltinVisualizerMode = 'classic' | 'cadenza' | 'partita' | 'fume' |
 export type VisualizerMode = BuiltinVisualizerMode | (string & {});
 export type VisualizerFrameRate = 'off' | 120 | 90 | 60;
 
-export type HomeViewTab = 'playlist' | 'local' | 'albums' | 'navidrome' | 'radio';
+export type HomeViewTab = 'playlist' | 'local' | 'albums' | 'navidrome' | 'jellyfin' | 'radio';
 
 export type PlaybackContext = 'main' | 'stage';
 export type StageSource = 'stage-api' | 'now-playing' | 'playercap';
@@ -1242,6 +1242,7 @@ export interface SongResult {
 
 export interface OnlineLyricsState {
   lyricsSource: 'online' | 'imported';
+  jellyfinSkipOnlineMatch?: boolean;
   importedLyrics?: LyricData | null;
   importedLyricsName?: string | null;
   hasOnlineOverride?: boolean;

@@ -28,6 +28,7 @@ import { LocalFolderSongInfoPanel } from '../../modal/LocalFolderSongInfoPanel';
 import { LocalSongMetadataMatchDialog } from '../../modal/LocalSongMetadataMatchDialog';
 import { buildLocalLibraryIndex, followEntityRedirect } from '../../../utils/localLibraryIndex';
 import { resolveSongCatalogRef } from '../../../services/onlineMusic/catalogRefs';
+import { omni } from '../../../services/onlineMusic/omni';
 import type { HomeSurfaceProps } from './homeSurfaceTypes';
 import { useThemeSettingsStore } from '../../../stores/useThemeSettingsStore';
 import { countRender } from '../../../dev/renderCount';
@@ -138,6 +139,7 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
     const [externalTracksLoading, setExternalTracksLoading] = useState(false);
     const [resolvedLocalCollectionCoverUrl, setResolvedLocalCollectionCoverUrl] = useState<string | undefined>(undefined);
     const [navidromePlaylistItems, setNavidromePlaylistItems] = useState<Array<{ id: string | number; name: string; description?: string; }>>([]);
+    const [jellyfinPlaylistItems, setJellyfinPlaylistItems] = useState<Array<{ id: string | number; name: string; canEditItems: boolean; isOwned?: boolean }>>([]);
     const [editingEntityId, setEditingEntityId] = useState<string | null>(null);
     const [organizingFolder, setOrganizingFolder] = useState<LocalGridViewCollectionDescriptor | null>(null);
     const [matchingSongId, setMatchingSongId] = useState<string | null>(null);
@@ -524,11 +526,31 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
         })));
     }, []);
 
+    const refreshJellyfinPlaylists = useCallback(async () => {
+        try {
+            const overview = await omni.getJellyfinHomeOverview();
+            setJellyfinPlaylistItems(overview.playlists
+                .filter(playlist => playlist.isOwned === true && playlist.providerData?.canEditItems === true)
+                .map(playlist => ({ id: playlist.id, name: playlist.name, canEditItems: true, isOwned: playlist.isOwned })));
+        } catch (error) {
+            console.warn('[GridViewOverlayHost] Failed to refresh Jellyfin playlists:', error);
+            setJellyfinPlaylistItems([]);
+        }
+    }, []);
+
     useEffect(() => {
         if (selectedCollection && isNavidromeGridViewCollection(selectedCollection)) {
             void refreshNavidromePlaylists();
         }
     }, [refreshNavidromePlaylists, selectedCollection]);
+
+    useEffect(() => {
+        if (selectedCollection?.source === 'online' && selectedCollection.providerId === 'jellyfin') {
+            void refreshJellyfinPlaylists();
+        } else {
+            setJellyfinPlaylistItems([]);
+        }
+    }, [refreshJellyfinPlaylists, selectedCollection]);
 
     const handleSelectTrack = useCallback((track: SongResult, queue: SongResult[]) => {
         surfaceProps.onPlaySong(track, queue);
@@ -651,7 +673,29 @@ const GridViewOverlayHost: React.FC<GridViewOverlayHostProps> = ({
                 });
             },
         },
-    }), [surfaceProps, navidromePlaylistItems, refreshNavidromePlaylists]);
+        jellyfin: {
+            availablePlaylists: jellyfinPlaylistItems,
+            onAddToPlaylist: async (playlistId, songs) => {
+                const playlist = jellyfinPlaylistItems.find(item => String(item.id) === String(playlistId));
+                if (!playlist) return;
+                await omni.updateCollectionTracks({ providerId: 'jellyfin', id: playlist.id, name: playlist.name, type: 'playlist' }, 'add', songs);
+                await refreshJellyfinPlaylists();
+            },
+            onCreatePlaylist: async (name, songs) => {
+                await omni.createJellyfinPlaylist(name, songs);
+                await refreshJellyfinPlaylists();
+            },
+            onRenamePlaylist: async (playlistId, name) => {
+                const playlist = { providerId: 'jellyfin', id: playlistId, name: '', type: 'playlist' };
+                await omni.renameJellyfinPlaylist(playlist, name);
+                await refreshJellyfinPlaylists();
+            },
+            onDeletePlaylist: async playlistId => {
+                await omni.deleteJellyfinPlaylist({ providerId: 'jellyfin', id: playlistId, name: '', type: 'playlist' });
+                await refreshJellyfinPlaylists();
+            },
+        },
+    }), [surfaceProps, navidromePlaylistItems, refreshNavidromePlaylists, jellyfinPlaylistItems, refreshJellyfinPlaylists]);
 
     const editingEntity = editingEntityId
         ? localLibraryCatalog.entities.find(entity => entity.id === editingEntityId)

@@ -43,7 +43,7 @@ import type { PlaybackSnapshot, PlaybackNavigationOptions } from '../types/appPl
 import type { NavidromeSong } from '../types/navidrome';
 import type { NavidromeMatchData } from '../components/modal/NaviLyricMatchModal';
 import { applyQueueAddBehavior } from '../utils/queueAddBehavior';
-import { loadOnlineLyricsState, resolveOnlineLyrics, saveOnlineLyricsState, getOnlineLyricsStateCacheKey } from '../utils/onlineLyricsState';
+import { loadOnlineLyricsState, resolveOnlineLyrics, saveOnlineLyricsState, getOnlineLyricsStateCacheKey, shouldSkipJellyfinOnlineLyricMatch } from '../utils/onlineLyricsState';
 import { hasLocalSongCover } from '../utils/localSongCover';
 import { getLocalCoverAssetUrl } from '../services/localCoverAssetUrl';
 import { applyMatchedMetadata } from '../services/localLibraryCatalogService';
@@ -216,21 +216,65 @@ export function useLibraryPlaybackController({
         onlineSong: SongResult,
         fallbackLyrics: LyricData | null = lyrics
     ): Promise<LyricData | null> => {
+        const source = getPlaybackSourceRef(onlineSong);
+        if (source.kind === 'online' && source.providerId === 'jellyfin') {
+            const state = await loadOnlineLyricsState(onlineSong);
+            const providerLyrics = (await omni.getLyrics(onlineSong, { userId })).lyrics;
+            if (shouldSkipJellyfinOnlineLyricMatch(onlineSong, state) || state?.hasOnlineOverride) {
+                return providerLyrics;
+            }
+            if (providerLyrics) return providerLyrics;
+
+            try {
+                const metadata = getProviderSongMetadata(onlineSong);
+                const match = await autoMatchBestLyric(
+                    onlineSong.name,
+                    metadata.artists.map(artist => artist.name).filter(Boolean).join(', '),
+                    metadata.durationMs,
+                    {
+                        album: metadata.album?.name,
+                        preferredSource: useLyricSettingsStore.getState().preferredAlternativeLyricSource,
+                    },
+                );
+                if (match && !('isPureMusic' in match)) {
+                    const nextState: OnlineLyricsState = {
+                        ...state,
+                        lyricsSource: 'online',
+                        hasOnlineOverride: true,
+                        onlineOverrideLyrics: match.lyrics,
+                        matchedSongId: match.id,
+                        matchedIsPureMusic: false,
+                        matchedLyricsSource: match.source,
+                        matchedLyricsProviderPlatform: match.matchedLyricsProviderPlatform,
+                    };
+                    await saveOnlineLyricsState(onlineSong, nextState);
+                    return providerLyrics;
+                }
+            } catch (error) {
+                console.warn('[Jellyfin] Native lyrics were unavailable and Folia lyric matching failed:', error);
+            }
+            return providerLyrics;
+        }
+
         const cachedLyrics = await getSongCacheWithLegacyMigration<LyricData>('lyric', onlineSong, migrateLyricDataRenderHints);
         if (cachedLyrics) return cachedLyrics;
 
         const prefetched = getPrefetchedData(onlineSong, audioQuality);
         if (prefetched?.lyrics) return prefetched.lyrics;
 
-        return (await omni.getLyrics(onlineSong, { userId })).lyrics ?? fallbackLyrics;
+        const providerLyrics = (await omni.getLyrics(onlineSong, { userId })).lyrics;
+        if (providerLyrics) return providerLyrics;
+
+        return fallbackLyrics;
     }, [audioQuality, lyrics, userId]);
 
     const resolveOnlineSongLyricsState = useCallback(async (
         onlineSong: SongResult,
         fallbackLyrics: LyricData | null = lyrics
     ): Promise<{ state: OnlineLyricsState | null; lyrics: LyricData | null; }> => {
-        const state = await loadOnlineLyricsState(onlineSong);
+        let state = await loadOnlineLyricsState(onlineSong);
         const baseLyrics = await loadBaseOnlineLyrics(onlineSong, fallbackLyrics);
+        state = await loadOnlineLyricsState(onlineSong) ?? state;
         return {
             state,
             lyrics: resolveOnlineLyrics(state, baseLyrics),

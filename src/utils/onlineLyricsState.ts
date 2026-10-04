@@ -1,6 +1,6 @@
 import { getFromCacheWithMigration, saveToCache } from '../services/db';
 import { getSongResourceCacheKey } from '../services/onlineMusic/resourceKeys';
-import type { OnlineLyricsState, SongResult } from '../types';
+import type { LyricData, OnlineLyricsState, SongResult } from '../types';
 import type { MigrationResult } from './lyrics/renderHints';
 import { migrateLyricDataRenderHints as migrateLyrics } from './lyrics/renderHints';
 import { isPureMusicLyricText } from './lyrics/pureMusic';
@@ -25,6 +25,18 @@ const migrateOnlineLyricsState = (value: OnlineLyricsState): MigrationResult<Onl
 
 export const getOnlineLyricsStateCacheKey = (song: SongResult) =>
     `${getSongResourceCacheKey('lyric', song)}${ONLINE_LYRICS_STATE_SUFFIX}`;
+
+export const shouldSkipJellyfinOnlineLyricMatch = (
+    song: SongResult,
+    state: OnlineLyricsState | null | undefined,
+): boolean => song.sourceRef?.kind === 'online'
+    && song.sourceRef.providerId === 'jellyfin'
+    && state?.jellyfinSkipOnlineMatch === true;
+
+export const hasJellyfinServerLyrics = (song: SongResult, lyrics: LyricData | null | undefined): boolean =>
+    song.sourceRef?.kind === 'online'
+    && song.sourceRef.providerId === 'jellyfin'
+    && Boolean(lyrics?.lines.length);
 
 export const loadOnlineLyricsState = async (song: SongResult): Promise<OnlineLyricsState | null> => {
     const key = getOnlineLyricsStateCacheKey(song);

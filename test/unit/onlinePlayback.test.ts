@@ -235,6 +235,73 @@ describe('online QQ lyric candidate plumbing', () => {
     });
 });
 
+describe('Jellyfin lyric matching preference', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        songCacheMock.mockResolvedValue({ lines: [{ startTime: 0, endTime: 1, fullText: 'stale match', words: [] }] });
+        loadLyricsStateMock.mockResolvedValue({
+            lyricsSource: 'online',
+            jellyfinSkipOnlineMatch: true,
+            hasOnlineOverride: false,
+        });
+    });
+
+    it('uses Jellyfin lyrics and bypasses cached matches and automatic online matching', async () => {
+        const jellyfinSong: SongResult = {
+            ...song,
+            id: 'jellyfin-track',
+            sourceRef: { kind: 'online', providerId: 'jellyfin', mediaId: 'jellyfin-track' },
+        };
+        const serverLyrics = {
+            lines: [{ startTime: 0, endTime: 1, fullText: 'server lyric', words: [] }],
+            isWordByWord: false,
+        };
+        lyricsMock.mockResolvedValue({ lyrics: serverLyrics, isPureMusic: false });
+        const onLyrics = vi.fn();
+        const onDone = vi.fn();
+
+        await loadOnlineSongLyrics(jellyfinSong, {
+            lyrics: { lines: [{ startTime: 0, endTime: 1, fullText: 'stale prefetch', words: [] }] },
+        } as any, null, {
+            isCurrent: () => true,
+            onLyrics,
+            onDone,
+        });
+
+        expect(lyricsMock).toHaveBeenCalledWith(jellyfinSong, { userId: null });
+        expect(songCacheMock).not.toHaveBeenCalled();
+        expect(autoMatchMock).not.toHaveBeenCalled();
+        expect(onLyrics).toHaveBeenCalledWith(serverLyrics);
+        expect(onDone).toHaveBeenCalledOnce();
+    });
+
+    it('keeps available Jellyfin server lyrics as the default when automatic best matching is enabled', async () => {
+        loadLyricsStateMock.mockResolvedValue(null);
+        const jellyfinSong: SongResult = {
+            ...song,
+            id: 'jellyfin-track-with-lyrics',
+            sourceRef: { kind: 'online', providerId: 'jellyfin', mediaId: 'jellyfin-track-with-lyrics' },
+        };
+        const serverLyrics = {
+            lines: [{ startTime: 0, endTime: 1, fullText: 'server lyric', words: [] }],
+            isWordByWord: false,
+        };
+        lyricsMock.mockResolvedValue({ lyrics: serverLyrics, mainText: '[00:00.00]server lyric', isPureMusic: false });
+        const onLyrics = vi.fn();
+
+        await loadOnlineSongLyrics(jellyfinSong, null, null, {
+            isCurrent: () => true,
+            onLyrics,
+            onDone: vi.fn(),
+        });
+
+        expect(lyricsMock).toHaveBeenCalledWith(jellyfinSong, { userId: null });
+        expect(autoMatchMock).not.toHaveBeenCalled();
+        expect(saveLyricsStateMock).not.toHaveBeenCalled();
+        expect(onLyrics).toHaveBeenCalledWith(serverLyrics);
+    });
+});
+
 describe('instrumental tracks, once auto-match has settled them', () => {
     beforeEach(() => {
         vi.clearAllMocks();

@@ -9,6 +9,7 @@ import { SongResult, LocalSong, LocalPlaylist, LocalLibraryGroup, Theme, PlayerS
 import { getNavidromeConfig, navidromeApi } from '../services/navidromeService';
 import LocalGrid3DView from './app/home/LocalGrid3DView';
 import NavidromeGrid3DView from './app/home/NavidromeGrid3DView';
+import JellyfinGrid3DView from './app/home/JellyfinGrid3DView';
 import DesktopGrid3DSurface from './folia-grid/DesktopGrid3DSurface';
 import {
     createOnlineGridViewCollection,
@@ -33,6 +34,7 @@ import type { MediaId, OmniProviderCapabilities, ProviderAccountSummary, Provide
 import qqIcon from '../assets/providers/qq.svg';
 import wechatIcon from '../assets/providers/wechat.svg';
 import { useHomeLayoutSettingsStore } from '../stores/useHomeLayoutSettingsStore';
+import { useLibraryStore } from '../stores/useLibraryStore';
 import { useNeteaseApiStatusStore } from '../stores/useNeteaseApiStatusStore';
 import { useThemeSettingsStore } from '../stores/useThemeSettingsStore';
 import { countRender } from '../dev/renderCount';
@@ -201,6 +203,10 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
     })));
 
     const isOnlineTab = homeViewTab === 'playlist' || homeViewTab === 'albums' || homeViewTab === 'radio';
+    const jellyfinEnabled = useLibraryStore(state => state.jellyfinEnabled);
+    useEffect(() => {
+        if (homeViewTab === 'jellyfin' && !jellyfinEnabled) setHomeViewTab('local');
+    }, [homeViewTab, jellyfinEnabled, setHomeViewTab]);
     const activeProviderId = onlineProviderPlatform?.activeProviderId || 'netease';
     const activeProviderSummary = onlineProviderPlatform?.activeProvider;
     const activeProviderCapabilities = readProviderCapabilities(activeProviderId);
@@ -805,6 +811,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                                                 : 'localMusic.importNotSupported'),
                                     }] : []),
                                     ...(navidromeEnabled ? [{ key: 'navidrome', label: t('navidrome.title') || 'Navidrome', disabledReason: undefined }] : []),
+                                    ...(jellyfinEnabled ? [{ key: 'jellyfin', label: 'Jellyfin', disabledReason: undefined }] : []),
                                 ].map((tab) => {
                                     const isActive = homeViewTab === tab.key;
                                     return (
@@ -895,7 +902,17 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
 
             {/* Desktop Canvas Surface */}
             <div className="flex-1 min-h-0 flex flex-col items-center justify-center relative">
-                {isOnlineTab && activeAccountView === 'accountless' ? (
+                {homeViewTab === 'jellyfin' && jellyfinEnabled ? (
+                    <JellyfinGrid3DView
+                        theme={theme}
+                        isDaylight={isDaylight}
+                        isInteractive={isInteractive}
+                        hasFloatingPlayer={Boolean(currentTrack)}
+                        userId={String(omni.getJellyfinConnection()?.userId || '')}
+                        selectedLibraryCount={omni.getJellyfinConnection()?.selectedLibraryIds.length || 0}
+                        onOpenGridView={onOpenGridView}
+                    />
+                ) : isOnlineTab && activeAccountView === 'accountless' ? (
                     <OnlineProviderAccountlessPanel
                         providerLabel={activeProviderLabel}
                         isDaylight={isDaylight}

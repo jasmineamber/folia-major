@@ -3,6 +3,7 @@ import { saveProviderAccountSnapshot } from '@/services/onlineMusic/providerAcco
 import { omni } from '@/services/onlineMusic/omni';
 import { registerOnlineMusicProvider, unregisterOnlineMusicProvider } from '@/services/onlineMusic/providerRegistry';
 import { useOnlineProviderAccountStore } from '@/stores/useOnlineProviderAccountStore';
+import { jellyfinProvider } from '@/services/onlineMusic/jellyfinProvider';
 import type { UnifiedSong } from '@/types';
 import type { OnlineMusicProvider, ProviderCapabilities, ProviderCollection } from '@/types/onlineMusic';
 
@@ -53,6 +54,7 @@ afterEach(() => {
     unregisterOnlineMusicProvider(otherProviderId);
     useOnlineProviderAccountStore.getState().setActiveProviderId('netease');
     omni.invalidateActiveRequests();
+    registerOnlineMusicProvider(jellyfinProvider);
 });
 
 describe('omni routing', () => {
@@ -85,6 +87,20 @@ describe('omni routing', () => {
         await expect(omni.searchSongs('query', { limit: 10, offset: 0 })).resolves.toMatchObject({ items: [{ name: `${providerId}:1` }] });
         await expect(omni.getAudioSource(song(otherProviderId, '9'), 'standard')).resolves.toMatchObject({ url: `https://${otherProviderId}/9` });
         expect(activeSearch).toHaveBeenCalledWith('query', 10, 0);
+    });
+
+    it('routes Jellyfin collections through the Jellyfin adapter regardless of the active provider', async () => {
+        const getCollectionTracks = vi.fn(async () => ({ items: [song('jellyfin', 'jf-1')], hasMore: false, nextOffset: 1 }));
+        registerOnlineMusicProvider({
+            ...jellyfinProvider,
+            jellyfin: { ...jellyfinProvider.jellyfin!, getCollectionTracks },
+        });
+
+        const collection: ProviderCollection = { providerId: 'jellyfin', id: 'playlist-1', name: 'Playlist', type: 'playlist' };
+        const page = await omni.getCollectionTracks(collection, { limit: 10, offset: 0 });
+
+        expect(getCollectionTracks).toHaveBeenCalledWith(collection, 10, 0);
+        expect(page.items[0].sourceRef).toMatchObject({ kind: 'online', providerId: 'jellyfin', mediaId: 'jf-1' });
     });
 
     it('forwards normalized provider ReplayGain metadata through the audio facade', async () => {

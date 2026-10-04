@@ -3,7 +3,7 @@ import { saveToCache } from './db';
 import { PrefetchedSongData, isUrlValid, updatePrefetchedAudioUrl } from './prefetchService';
 import { isPureMusicLyricText } from '../utils/lyrics/pureMusic';
 import { migrateLyricDataRenderHints } from '../utils/lyrics/renderHints';
-import { loadOnlineLyricsState, markOnlineLyricsPureMusic, resolveOnlineLyrics, resolveOnlineLyricsPureMusic, saveOnlineLyricsState } from '../utils/onlineLyricsState';
+import { hasJellyfinServerLyrics, loadOnlineLyricsState, markOnlineLyricsPureMusic, resolveOnlineLyrics, resolveOnlineLyricsPureMusic, saveOnlineLyricsState, shouldSkipJellyfinOnlineLyricMatch } from '../utils/onlineLyricsState';
 import { autoMatchBestLyric } from '../utils/lyrics/autoMatchBestLyric';
 import { createSafeObjectUrl } from '../utils/blobGuards';
 import type { AudioQualityPreference, MediaId } from '../types/onlineMusic';
@@ -92,6 +92,16 @@ export async function loadOnlineSongLyrics(
     if (!isCurrent()) return;
     onStateChange?.(onlineLyricsState);
 
+    // A saved Jellyfin preference must bypass stale Folia lyric caches and automatic online matching.
+    if (shouldSkipJellyfinOnlineLyricMatch(song, onlineLyricsState)) {
+        const providerLyrics = await omni.getLyrics(song, { userId });
+        if (!isCurrent()) return;
+        onPureMusicChange?.(providerLyrics.isPureMusic);
+        onLyrics(providerLyrics.lyrics);
+        onDone();
+        return;
+    }
+
     const cachedLyrics = await getSongCacheWithLegacyMigration<LyricData>('lyric', song, migrateLyricDataRenderHints);
     if (!isCurrent()) return;
     const preferredCachedLyrics = resolveOnlineLyrics(onlineLyricsState, cachedLyrics);
@@ -118,7 +128,9 @@ export async function loadOnlineSongLyrics(
         const effectiveLyrics = preferredPrefetchedLyrics ?? prefetched.lyrics;
 
   const settingsLyricSettings = useLyricSettingsStore.getState();
-        const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric && !onlineLyricsState?.hasOnlineOverride;
+        const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric
+            && !onlineLyricsState?.hasOnlineOverride
+            && !hasJellyfinServerLyrics(song, prefetched.lyrics);
 
         if (!shouldAutoMatch) {
             const effectiveText = effectiveLyrics?.lines.map(line => line.fullText).join('\n') ?? '';
@@ -163,7 +175,9 @@ export async function loadOnlineSongLyrics(
     let finalState = onlineLyricsState;
 
   const settingsLyricSettings = useLyricSettingsStore.getState();
-    const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric && !onlineLyricsState?.hasOnlineOverride;
+    const shouldAutoMatch = settingsLyricSettings.autoUseBestLyric
+        && !onlineLyricsState?.hasOnlineOverride
+        && !hasJellyfinServerLyrics(song, parsedLyrics);
 
     if (shouldAutoMatch) {
         // The lyrics in hand are already displayable, so hand them over and report done BEFORE the

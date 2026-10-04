@@ -1,6 +1,10 @@
 import type { SongResult, UnifiedSong } from '../../types';
 import type {
     AudioQualityPreference,
+    JellyfinConnectionState,
+    JellyfinHomeOverview,
+    JellyfinLibrary,
+    JellyfinPlaybackEvent,
     MediaId,
     OmniAudioSource,
     OmniChorusRange,
@@ -128,7 +132,7 @@ export const omni = {
 
     getProviderSummaries(): OmniProviderSummary[] {
         const accounts = useOnlineProviderAccountStore.getState().accounts;
-        return listOnlineMusicProviders().map(provider => {
+        return listOnlineMusicProviders().filter(provider => provider.id !== 'jellyfin').map(provider => {
             const account = accounts[provider.id];
             return {
                 providerId: provider.id,
@@ -195,6 +199,84 @@ export const omni = {
     getProviderLabel(providerId: OmniProviderId): string {
         const provider = getOnlineMusicProvider(providerId);
         return provider?.shortName || provider?.displayName || providerId;
+    },
+
+    getJellyfinConnection(): JellyfinConnectionState | null {
+        return requireOnlineMusicProvider('jellyfin').jellyfin?.getConnection() ?? null;
+    },
+
+    async loginJellyfin(serverUrl: string, username: string, password: string): Promise<JellyfinConnectionState> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin connection');
+        return jellyfin.login(serverUrl, username, password);
+    },
+
+    async logoutJellyfin(): Promise<void> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin connection');
+        await jellyfin.logout();
+    },
+
+    async getJellyfinLibraries(): Promise<JellyfinLibrary[]> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin libraries');
+        return jellyfin.getLibraries();
+    },
+
+    async setJellyfinLibraries(libraryIds: string[]): Promise<void> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin libraries');
+        await jellyfin.setSelectedLibraries(libraryIds);
+    },
+
+    async getJellyfinHomeOverview(): Promise<JellyfinHomeOverview> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin library');
+        return jellyfin.getHomeOverview();
+    },
+
+    async createJellyfinPlaylist(name: string, songs?: SongResult[]): Promise<OmniCollection> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin playlists');
+        return jellyfin.createPlaylist(name, songs);
+    },
+
+    async renameJellyfinPlaylist(playlist: OmniCollection, name: string): Promise<void> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin playlists');
+        await jellyfin.renamePlaylist(playlist, name);
+    },
+
+    async deleteJellyfinPlaylist(playlist: OmniCollection): Promise<void> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin playlists');
+        await jellyfin.deletePlaylist(playlist);
+    },
+
+    async searchJellyfinSongs(query: string, page: PageInput): Promise<OmniPage<UnifiedSong>> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin search');
+        return jellyfin.searchSongs(query, page.limit, page.offset);
+    },
+
+    async getJellyfinCollectionTracks(collection: OmniCollection, page: PageInput): Promise<OmniPage<UnifiedSong>> {
+        const jellyfin = requireOnlineMusicProvider('jellyfin').jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin collections');
+        return jellyfin.getCollectionTracks(collection, page.limit, page.offset);
+    },
+
+    async reportJellyfinPlaybackEvent(song: SongResult, event: JellyfinPlaybackEvent): Promise<void> {
+        const source = getPlaybackSourceRef(song);
+        if (source.kind !== 'online' || source.providerId !== 'jellyfin') {
+            return unsupported('jellyfin', 'Jellyfin playback reporting');
+        }
+        const jellyfin = requireOnlineMusicProvider(source.providerId).jellyfin;
+        if (!jellyfin) return unsupported('jellyfin', 'Jellyfin playback reporting');
+        await jellyfin.reportPlaybackEvent(song, event);
+    },
+
+    subscribeJellyfinConnection(listener: () => void): () => void {
+        return requireOnlineMusicProvider('jellyfin').jellyfin?.subscribeConnection?.(listener) ?? (() => {});
     },
 
     async searchSongs(query: string, page: PageInput): Promise<OmniPage<UnifiedSong>> {
@@ -364,6 +446,7 @@ export const omni = {
     canEditCollectionTracks(collection: OmniCollection): boolean {
         const provider = getOnlineMusicProvider(collection.providerId);
         if (!providerSupports(provider, 'mutations')) return false;
+        if (collection.providerId === 'jellyfin' && collection.providerData?.canEditItems !== true) return false;
         if (collection.isLiked === true) {
             return providerSupports(provider, 'likes') && Boolean(provider?.mutations?.likeSong);
         }
@@ -522,6 +605,9 @@ export const omni = {
 
     async getCollectionTracks(collection: OmniCollection, page: PageInput): Promise<OmniPage<UnifiedSong>> {
         const provider = providerForCollection(collection);
+        if (collection.providerId === 'jellyfin' && provider.jellyfin) {
+            return provider.jellyfin.getCollectionTracks(collection, page.limit, page.offset);
+        }
         if (collection.type === 'album') {
             return provider.catalog?.getAlbumTracks?.(collection.id, page.limit, page.offset, collection) ?? emptyPage(page.offset);
         }
@@ -573,6 +659,10 @@ export const omni = {
     },
 
     async updateCollectionTracks(collection: OmniCollection, operation: 'add' | 'del', tracks: SongResult[]): Promise<void> {
+        if (collection.providerId === 'jellyfin'
+            && (collection.isOwned !== true || collection.providerData?.canEditItems !== true)) {
+            return unsupported('jellyfin', 'playlist-track-mutations');
+        }
         const provider = providerForCollection(collection);
         const mutations = provider.mutations;
         if (

@@ -88,6 +88,8 @@ import { usePlaybackUiEffects } from './hooks/usePlaybackUiEffects';
 import { useLibraryPlaybackController } from './hooks/useLibraryPlaybackController';
 import { useNavidromeScrobbleReporter } from './hooks/useNavidromeScrobbleReporter';
 import { useNeteaseScrobbleReporter } from './hooks/useNeteaseScrobbleReporter';
+import { useJellyfinLibrary } from './hooks/useJellyfinLibrary';
+import { useJellyfinPlaybackReporter } from './hooks/useJellyfinPlaybackReporter';
 import { usePlaybackQueueController } from './hooks/usePlaybackQueueController';
 import { usePlaybackTransportController } from './hooks/usePlaybackTransportController';
 import { useLocalLibraryCatalog } from './hooks/useLocalLibraryCatalog';
@@ -732,18 +734,21 @@ export default function App() {
         logout: logoutQqLibrary,
     } = useQqLibrary();
     const { refresh: refreshBodianLibrary, logout: logoutBodianLibrary } = useBodianLibrary();
+    const { refresh: refreshJellyfinLibrary, logout: logoutJellyfinLibrary } = useJellyfinLibrary();
     const onlineProviderRefreshers = useMemo(() => ({
         netease: refreshUserData,
         kugou: refreshKugouLibrary,
         qq: refreshQqLibrary,
         bodian: refreshBodianLibrary,
-    }), [refreshKugouLibrary, refreshQqLibrary, refreshBodianLibrary, refreshUserData]);
+        jellyfin: refreshJellyfinLibrary,
+    }), [refreshKugouLibrary, refreshQqLibrary, refreshBodianLibrary, refreshJellyfinLibrary, refreshUserData]);
     const onlineProviderLogouts = useMemo(() => ({
         netease: handleLogout,
         kugou: logoutKugouLibrary,
         qq: logoutQqLibrary,
         bodian: logoutBodianLibrary,
-    }), [handleLogout, logoutKugouLibrary, logoutQqLibrary, logoutBodianLibrary]);
+        jellyfin: logoutJellyfinLibrary,
+    }), [handleLogout, logoutKugouLibrary, logoutQqLibrary, logoutBodianLibrary, logoutJellyfinLibrary]);
 
     const prepareOnlineProviderSwitch = useCallback((_currentProviderId: OnlineProviderId, nextProviderId: OnlineProviderId): Promise<boolean> => {
         return new Promise<boolean>((resolve) => {
@@ -1439,6 +1444,7 @@ export default function App() {
         currentSong,
         activeDeck: automix.activeDeck,
     });
+    useJellyfinPlaybackReporter({ audioRef, currentSong, activeDeck: automix.activeDeck });
 
     const {
         mediaSessionPlayRef,
@@ -2545,7 +2551,11 @@ export default function App() {
             onLoadedMetadata={(e) => {
                 const audioElement = e.currentTarget;
                 if (!automix.isActiveDeck(audioElement)) return;
-                setDuration(audioElement.duration);
+                const mediaDuration = audioElement.duration;
+                const metadataDuration = (currentSong?.durationMs || 0) / 1000;
+                setDuration(Number.isFinite(mediaDuration) && mediaDuration > 0
+                    ? mediaDuration
+                    : Number.isFinite(metadataDuration) && metadataDuration > 0 ? metadataDuration : 0);
                 // While the picture is held, this deck is the track ARRIVING: its length and its
                 // position belong to a song the listener cannot see yet, and writing either here
                 // would snap the bar to zero mid-blend. `duration` above is still set because the

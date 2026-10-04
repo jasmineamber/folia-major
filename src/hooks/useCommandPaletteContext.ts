@@ -31,6 +31,7 @@ import { useSleepTimerStore } from '../stores/useSleepTimerStore';
 import { useTypographySettingsStore } from '../stores/useTypographySettingsStore';
 import { useVisualizerSettingsStore } from '../stores/useVisualizerSettingsStore';
 import { useLyricSegmentationStore } from '../stores/useLyricSegmentationStore';
+import { useLibraryStore } from '../stores/useLibraryStore';
 import { useLatticeSettingsStore } from '../stores/useLatticeSettingsStore';
 import type { LyricSegmentationActions } from '../components/app/playback/createLyricSegmentationActions';
 
@@ -139,6 +140,7 @@ export const useCommandPaletteContext = (
     const lyricStaffPolicy = useLyricSettingsStore(state => state.lyricStaffPolicy);
     const lyricStaffAbsorbMode = useLyricSettingsStore(state => state.lyricStaffAbsorbMode);
     const personalFmSelection = usePersonalFmModeStore(state => state.selection);
+    const jellyfinEnabled = useLibraryStore(state => state.jellyfinEnabled);
     // Which surface the palette is opening over; commands that only apply to one of them gate on it.
     const latticeFocusAction = useLatticeControlsStore(state => state.focusCurrentSong);
     const view = useAppViewStore(state => state.view);
@@ -199,6 +201,6 @@ export const useCommandPaletteContext = (
         settingsSignals, chromeSignals, desktopSignals, automixSignals,
         sleepTimerSignals, latticeSignals, audioSignals, visualizerSignals,
         lyricStaffPolicy, lyricStaffAbsorbMode, personalFmSelection, view, commandFilter, gridSurface, canAddCurrentSongToPlaylist,
-        lyricSegmentationRecord, lyricSegmentationActions, latticeFocusAction,
+        lyricSegmentationRecord, lyricSegmentationActions, latticeFocusAction, jellyfinEnabled,
     ]);
 };

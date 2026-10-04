@@ -75,6 +75,8 @@ exports[`command palette registry contract > keeps the registered command order 
   "settings-local-lyric-format-order",
   "settings-integration",
   "settings-navidrome",
+  "settings-jellyfin",
+  "jellyfin-toggle",
   "settings-stage-mode",
   "automix-toggle",
   "transition-mode-crossfade",

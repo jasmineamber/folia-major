@@ -3,6 +3,8 @@ import { AlertCircle, Check, Loader2, LogOut, Server } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { JellyfinLibrary } from '../../../types/onlineMusic';
 import { omni } from '../../../services/onlineMusic/omni';
+import { useLibraryStore } from '../../../stores/useLibraryStore';
+import { useSearchNavigationStore } from '../../../stores/useSearchNavigationStore';
 
 // src/components/modal/settings/JellyfinSettingsSection.tsx
 // Jellyfin sign-in, selected music libraries, and actionable connection errors.
@@ -21,6 +23,8 @@ const JellyfinSettingsSection: React.FC<JellyfinSettingsSectionProps> = ({
     successBgColor, successTextColor, errorBgColor, errorTextColor, settingsCardClass,
 }) => {
     const { t } = useTranslation();
+    const jellyfinEnabled = useLibraryStore(state => state.jellyfinEnabled);
+    const setJellyfinEnabled = useLibraryStore(state => state.setJellyfinEnabledState);
     const connection = omni.getJellyfinConnection();
     const [serverUrl, setServerUrl] = useState(connection?.serverUrl || '');
     const [username, setUsername] = useState(connection?.username || '');
@@ -89,7 +93,25 @@ const JellyfinSettingsSection: React.FC<JellyfinSettingsSectionProps> = ({
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
                     <Server size={14} /> Jellyfin
                 </h3>
-                {status === 'connected' && <span className={'px-2 py-0.5 ' + successBgColor + ' ' + successTextColor + ' text-xs rounded-full'}>{t('status.connected')}</span>}
+                <div className="flex items-center gap-3">
+                    {status === 'connected' && <span className={'px-2 py-0.5 ' + successBgColor + ' ' + successTextColor + ' text-xs rounded-full'}>{t('status.connected')}</span>}
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-checked={jellyfinEnabled}
+                        aria-label={t('jellyfin.enable', 'Enable Jellyfin')}
+                        onClick={() => {
+                            const enabled = !jellyfinEnabled;
+                            setJellyfinEnabled(enabled);
+                            if (!enabled && useSearchNavigationStore.getState().homeViewTab === 'jellyfin') {
+                                useSearchNavigationStore.getState().setHomeViewTab('local');
+                            }
+                        }}
+                        className={'relative h-6 w-12 rounded-full p-1 transition-colors ' + (jellyfinEnabled ? 'bg-emerald-500' : 'bg-white/20')}
+                    >
+                        <span className={'block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ' + (jellyfinEnabled ? 'translate-x-6' : 'translate-x-0')} />
+                    </button>
+                </div>
             </div>
             <label className="block space-y-1.5 text-sm">
                 <span>{t('jellyfin.serverUrl')}</span>

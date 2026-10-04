@@ -79,6 +79,7 @@ const createContext = (overrides: CommandPaletteContextOverrides = {}): CommandP
         },
         settings: {
             toggleRememberHomeCardPosition: vi.fn(),
+            toggleJellyfinEnabled: vi.fn(),
             openSettings: vi.fn(),
             lyricStaffPolicy: 'smart' as const,
             cycleLyricStaffPolicy: vi.fn(),

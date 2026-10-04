@@ -21,6 +21,7 @@ import { useSleepTimerStore } from '../../../stores/useSleepTimerStore';
 import { useTypographySettingsStore } from '../../../stores/useTypographySettingsStore';
 import { useThemeQuickEditorStore } from '../../../stores/useThemeQuickEditorStore';
 import { usePlayerBottomBarLayoutStore } from '../../../stores/usePlayerBottomBarLayoutStore';
+import { useLibraryStore } from '../../../stores/useLibraryStore';
 import type { SongResult } from '../../../types';
 import { cycleSubtitleContentMode } from '../../../utils/lyrics/alternateText';
 
@@ -91,6 +92,10 @@ export const buildSettingsCommandContext = (
         toggleRememberHomeCardPosition: () => {
             const home = useHomeLayoutSettingsStore.getState();
             home.handleToggleRememberHomeCardPosition(!home.rememberHomeCardPosition);
+        },
+        toggleJellyfinEnabled: () => {
+            const library = useLibraryStore.getState();
+            library.setJellyfinEnabledState(!library.jellyfinEnabled);
         },
         startPlayerBottomBarPositioning: usePlayerBottomBarLayoutStore.getState().requestPositioning,
         canStartPlayerBottomBarPositioning: Boolean(deps.currentSong) && !chrome.hidePlayerProgressBar,

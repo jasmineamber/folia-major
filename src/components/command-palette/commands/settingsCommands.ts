@@ -93,8 +93,10 @@ export const settingsCommands: CommandPaletteCommand[] = [
     createSettingsAnchorCommand('settings-transition', 'Smart transition', 'Jump to the FOLIA transition settings', ['automix', 'crossfade', 'transition', '智能过渡', '转场'], 'transitionSettings'),
     createSettingsAnchorCommand('settings-local-lyrics-priority', 'Local song lyrics priority', 'Choose whether local songs prefer local or online lyrics', ['local lyrics priority', 'online lyrics first', 'local song lyrics', '本地歌曲歌词优先级', '在线优先', '本地歌词', 'bendigeciyouxianji', 'bdgcyxj'], 'lyrics'),
     createSettingsAnchorCommand('settings-local-lyric-format-order', 'Local lyric file format priority', 'Choose which format wins when a track has several lyric files', ['lyric format priority', 'lyric file order', 'lrc ttml priority', '本地歌词文件格式优先级', '歌词格式', '格式优先级', 'geciwenjiangeshi', 'gcgsyxj'], 'lyrics'),
-    createSettingsCommand('settings-integration', 'Integration settings', 'Open Stage, Now Playing, and Navidrome settings', ['integration', 'stage', 'now playing', 'navidrome settings', '集成', '连接'], 'options', 'integration'),
+    createSettingsCommand('settings-integration', 'Integration settings', 'Open Stage, Now Playing, Navidrome, and Jellyfin settings', ['integration', 'stage', 'now playing', 'navidrome settings', 'jellyfin settings', '集成', '连接'], 'options', 'integration'),
     createSettingsAnchorCommand('settings-navidrome', 'Navidrome server', 'Jump to the Navidrome server connection', ['navidrome', 'subsonic', 'music server', '音乐服务器'], 'navidrome'),
+    createSettingsAnchorCommand('settings-jellyfin', 'Jellyfin server', 'Jump to the Jellyfin server connection', ['jellyfin', 'media server', '音乐服务器'], 'jellyfin'),
+    createToggleCommand('jellyfin-toggle', 'settings', 'Enable Jellyfin', 'Show or hide the Jellyfin home tab', ['jellyfin toggle', 'jellyfin tab', '启用 jellyfin'], context => context.settings.toggleJellyfinEnabled()),
     createSettingsAnchorCommand('settings-stage-mode', 'Stage mode', 'Jump to the Stage external player settings', ['stage', 'external player', '舞台模式'], 'stageMode'),
     {
         id: 'automix-toggle',

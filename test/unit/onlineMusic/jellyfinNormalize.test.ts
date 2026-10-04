@@ -32,6 +32,11 @@ describe('Jellyfin normalization', () => {
         });
     });
 
+    it('maps Jellyfin album and artist DTO types to Folia collection types', () => {
+        expect(normalizeJellyfinCollection({ Id: 'album-1', Name: 'Album' }, 'MusicAlbum').type).toBe('album');
+        expect(normalizeJellyfinCollection({ Id: 'artist-1', Name: 'Artist' }, 'MusicArtist').type).toBe('artist');
+    });
+
     it('normalizes structured Jellyfin lyrics and retains empty lyric responses', () => {
         expect(normalizeJellyfinLyrics({ Lyrics: [{ Start: 15_000_000, Text: 'Line' }] }).mainText).toBe('[00:01.50]Line');
         expect(normalizeJellyfinLyrics({ Lyrics: [] })).toMatchObject({ lyrics: null, mainText: null, isPureMusic: true });

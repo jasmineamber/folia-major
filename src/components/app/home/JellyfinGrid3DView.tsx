@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Clock3, Disc3, ListMusic, Shuffle, Sparkles, Star, UserRound } from 'lucide-react';
+import { Disc3, ListMusic, Server, Shuffle, Sparkles, Star, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Theme } from '../../../types';
 import type { JellyfinHomeOverview, ProviderCollection } from '../../../types/onlineMusic';
 import { omni } from '../../../services/onlineMusic/omni';
+import { useSettingsModalStore } from '../../../stores/useSettingsModalStore';
 import { DesktopGrid3DSurface, type DesktopGrid3DAction } from '../../folia-grid/DesktopGrid3DSurface';
 import type { Grid3DSliderItem } from '../../folia-grid/Grid3DSlider';
 import { createOnlineGridViewCollection } from './gridViewCollectionAdapters';
@@ -11,7 +12,7 @@ import { createOnlineGridViewCollection } from './gridViewCollectionAdapters';
 // src/components/app/home/JellyfinGrid3DView.tsx
 // Presents the selected Jellyfin libraries within the existing online home surface.
 
-type JellyfinSection = 'playlists' | 'albums' | 'artists' | 'recentlyAdded' | 'recentlyPlayed' | 'favorites' | 'random';
+type JellyfinSection = 'playlists' | 'albums' | 'artists' | 'recentlyAdded' | 'favorites' | 'random';
 
 type JellyfinGrid3DViewProps = {
     theme: Theme;
@@ -31,6 +32,7 @@ const JellyfinGrid3DView: React.FC<JellyfinGrid3DViewProps> = ({
     const [overview, setOverview] = useState<JellyfinHomeOverview | null>(null);
     const [error, setError] = useState('');
     const [focusedIndex, setFocusedIndex] = useState(0);
+    const connection = omni.getJellyfinConnection();
 
     useEffect(() => {
         let disposed = false;
@@ -49,13 +51,12 @@ const JellyfinGrid3DView: React.FC<JellyfinGrid3DViewProps> = ({
         albums: overview?.albums || [],
         artists: overview?.artists || [],
         recentlyAdded: overview ? [overview.recentlyAdded] : [],
-        recentlyPlayed: overview ? [overview.recentlyPlayed] : [],
         favorites: overview ? [overview.favorites] : [],
         random: overview ? [overview.randomMix] : [],
     }), [overview]);
     const names: Record<JellyfinSection, string> = {
         playlists: t('home.playlists'), albums: t('home.albums'), artists: t('jellyfin.artists'),
-        recentlyAdded: t('jellyfin.recentlyAdded'), recentlyPlayed: t('jellyfin.recentlyPlayed'),
+        recentlyAdded: t('jellyfin.recentlyAdded'),
         favorites: t('jellyfin.favorites'), random: t('jellyfin.random'),
     };
     const items = useMemo(() => sections[section].map(collection => ({
@@ -72,11 +73,26 @@ const JellyfinGrid3DView: React.FC<JellyfinGrid3DViewProps> = ({
         { id: 'artists', label: names.artists, icon: <UserRound size={13} />, active: section === 'artists', onClick: () => setSection('artists') },
         { id: 'playlists', label: names.playlists, icon: <ListMusic size={13} />, active: section === 'playlists', onClick: () => setSection('playlists') },
         { id: 'recently-added', label: names.recentlyAdded, icon: <Sparkles size={13} />, active: section === 'recentlyAdded', onClick: () => setSection('recentlyAdded') },
-        { id: 'recently-played', label: names.recentlyPlayed, icon: <Clock3 size={13} />, active: section === 'recentlyPlayed', onClick: () => setSection('recentlyPlayed') },
         { id: 'favorites', label: names.favorites, icon: <Star size={13} />, active: section === 'favorites', onClick: () => setSection('favorites') },
         { id: 'random', label: names.random, icon: <Shuffle size={13} />, active: section === 'random', onClick: () => setSection('random') },
     ];
     const emptyMessage = error || (selectedLibraryCount === 0 ? t('jellyfin.noLibrarySelected') : t('jellyfin.emptySection'));
+
+    if (!connection) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-5 opacity-70">
+                <Server size={56} />
+                <p className="text-sm">{t('jellyfin.notConfigured')}</p>
+                <button
+                    type="button"
+                    onClick={() => useSettingsModalStore.getState().openSettings('options', 'integration', null, 'jellyfin')}
+                    className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-sm font-semibold"
+                >
+                    {t('jellyfin.openSettings')}
+                </button>
+            </div>
+        );
+    }
 
     return (
         <DesktopGrid3DSurface

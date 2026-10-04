@@ -28,7 +28,9 @@ const ACTIVE_PROVIDER_KEY = 'active_online_provider_id';
 
 const getInitialProviderId = (): OnlineProviderId => {
     if (typeof localStorage === 'undefined' || typeof localStorage.getItem !== 'function') return 'netease';
-    return localStorage.getItem(ACTIVE_PROVIDER_KEY) || 'netease';
+    const stored = localStorage.getItem(ACTIVE_PROVIDER_KEY) || 'netease';
+    // Jellyfin has its own home tab and is not a general online platform.
+    return stored === 'jellyfin' ? 'netease' : stored;
 };
 
 const emptyAccount = (): OnlineProviderAccountState => ({

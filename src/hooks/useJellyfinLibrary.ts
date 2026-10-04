@@ -17,7 +17,7 @@ export const useJellyfinLibrary = () => {
         store.updateAccount('jellyfin', { status: 'authenticated', hydration: 'ready', freshness: 'refreshing', error: undefined, user: { id: connection.userId, nickname: connection.username } });
         try {
             const overview = await omni.getJellyfinHomeOverview();
-            const collections = [...overview.playlists, ...overview.albums, ...overview.artists, overview.recentlyAdded, overview.recentlyPlayed, overview.favorites, overview.randomMix];
+            const collections = [...overview.playlists, ...overview.albums, ...overview.artists, overview.recentlyAdded, overview.favorites, overview.randomMix];
             store.updateAccount('jellyfin', {
                 status: 'authenticated',
                 hydration: 'ready',

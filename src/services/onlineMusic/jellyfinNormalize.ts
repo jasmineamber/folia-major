@@ -123,7 +123,10 @@ export const normalizeJellyfinCollection = (
         name: artist.name,
         catalogRef: { providerId: 'jellyfin' as const, kind: 'artist' as const, id: artist.id },
     }));
-    const collectionType = type || asString(raw.Type).toLowerCase();
+    const rawType = type || asString(raw.Type);
+    const collectionType = rawType === 'MusicAlbum' ? 'album'
+        : rawType === 'MusicArtist' ? 'artist'
+            : rawType.toLowerCase() === 'playlist' ? 'playlist' : rawType.toLowerCase();
     const imageUrl = getImageUrl(raw, resolveImageUrl);
     const userData = asRecord(raw.UserData);
     const userId = asString(raw.OwnerUserId);

@@ -354,7 +354,6 @@ export interface JellyfinHomeOverview {
     albums: ProviderCollection[];
     artists: ProviderCollection[];
     recentlyAdded: ProviderCollection;
-    recentlyPlayed: ProviderCollection;
     favorites: ProviderCollection;
     randomMix: ProviderCollection;
     playlists: ProviderCollection[];

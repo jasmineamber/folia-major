@@ -23,7 +23,6 @@ import { jellyfinTransport, subscribeJellyfinConnection, type JellyfinItemRecord
 
 const VIRTUAL_COLLECTIONS = {
     recentlyAdded: { id: '__jellyfin_recently_added__', type: 'jellyfin-recently-added', name: 'Recently added' },
-    recentlyPlayed: { id: '__jellyfin_recently_played__', type: 'jellyfin-recently-played', name: 'Recently played' },
     favorites: { id: '__jellyfin_favorites__', type: 'jellyfin-favorites', name: 'Favorites' },
     randomMix: { id: '__jellyfin_random_mix__', type: 'jellyfin-random', name: 'Random mix' },
 } as const;
@@ -44,6 +43,11 @@ const getSongId = (song: SongResult): string => {
 };
 
 const normalizeSong = (item: JellyfinItemRecord): UnifiedSong => normalizeJellyfinSong(item, jellyfinTransport.getImageUrl);
+
+const pickSongCover = (items: JellyfinItemRecord[]): string | undefined => {
+    const covers = items.map(normalizeSong).flatMap(song => song.album.coverUrl ? [song.album.coverUrl] : []);
+    return covers.length ? covers[Math.floor(Math.random() * covers.length)] : undefined;
+};
 
 const normalizeCollection = (item: JellyfinItemRecord, type?: string): ProviderCollection => {
     const collection = normalizeJellyfinCollection(item, type || readString(item.Type), jellyfinTransport.getImageUrl);
@@ -159,10 +163,11 @@ const getLibraryCollection = async (
     return result.items.map(item => normalizeCollection(item));
 };
 
-const createVirtualCollection = (key: keyof typeof VIRTUAL_COLLECTIONS, trackCount?: number): ProviderCollection => ({
+const createVirtualCollection = (key: keyof typeof VIRTUAL_COLLECTIONS, trackCount?: number, coverUrl?: string): ProviderCollection => ({
     providerId: 'jellyfin',
     ...VIRTUAL_COLLECTIONS[key],
     ...(typeof trackCount === 'number' ? { trackCount } : {}),
+    ...(coverUrl ? { coverUrl } : {}),
     providerData: { virtualKind: key },
 });
 
@@ -170,8 +175,6 @@ const resolveVirtualQuery = (collection: ProviderCollection): Record<string, str
     switch (collection.type) {
         case VIRTUAL_COLLECTIONS.recentlyAdded.type:
             return { IncludeItemTypes: 'Audio', SortBy: 'DateCreated', SortOrder: 'Descending' };
-        case VIRTUAL_COLLECTIONS.recentlyPlayed.type:
-            return { IncludeItemTypes: 'Audio', SortBy: 'DatePlayed', SortOrder: 'Descending', Filters: 'IsPlayed' };
         case VIRTUAL_COLLECTIONS.favorites.type:
             return { IncludeItemTypes: 'Audio', Filters: 'IsFavorite', SortBy: 'SortName' };
         case VIRTUAL_COLLECTIONS.randomMix.type:
@@ -203,28 +206,26 @@ const getHomeOverview = async (): Promise<JellyfinHomeOverview> => {
         return {
             albums: [], artists: [], playlists: [],
             recentlyAdded: createVirtualCollection('recentlyAdded', 0),
-            recentlyPlayed: createVirtualCollection('recentlyPlayed', 0),
             favorites: createVirtualCollection('favorites', 0),
             randomMix: createVirtualCollection('randomMix'),
         };
     }
 
-    const [albums, artists, added, played, favorites, playlists] = await Promise.all([
+    const [albums, artists, added, favorites, random, playlists] = await Promise.all([
         getAllLibraryCollections({ IncludeItemTypes: 'MusicAlbum', SortBy: 'DateCreated', SortOrder: 'Descending' }),
         getAllLibraryCollections({ IncludeItemTypes: 'MusicArtist', SortBy: 'SortName', SortOrder: 'Ascending' }),
         getLibraryItems({ IncludeItemTypes: 'Audio', SortBy: 'DateCreated', SortOrder: 'Descending' }, 1, 0),
-        getLibraryItems({ IncludeItemTypes: 'Audio', SortBy: 'DatePlayed', SortOrder: 'Descending', Filters: 'IsPlayed' }, 1, 0),
-        getLibraryItems({ IncludeItemTypes: 'Audio', Filters: 'IsFavorite' }, 1, 0),
+        getLibraryItems({ IncludeItemTypes: 'Audio', Filters: 'IsFavorite' }, 30, 0),
+        getLibraryItems({ IncludeItemTypes: 'Audio', SortBy: 'Random' }, 30, 0),
         getAllPlaylists(),
     ]);
     return {
         albums,
         artists,
         playlists,
-        recentlyAdded: createVirtualCollection('recentlyAdded', added.total),
-        recentlyPlayed: createVirtualCollection('recentlyPlayed', played.total),
-        favorites: createVirtualCollection('favorites', favorites.total),
-        randomMix: createVirtualCollection('randomMix'),
+        recentlyAdded: createVirtualCollection('recentlyAdded', added.total, added.items[0] ? normalizeSong(added.items[0]).album.coverUrl : undefined),
+        favorites: createVirtualCollection('favorites', favorites.total, pickSongCover(favorites.items)),
+        randomMix: createVirtualCollection('randomMix', random.total, pickSongCover(random.items)),
     };
 };
 
@@ -280,7 +281,6 @@ const getCollectionTracks = async (
 
     const virtualKind = readString(collection.providerData?.virtualKind);
     if (virtualKind === 'recentlyAdded') return getCollectionTracks({ ...collection, type: VIRTUAL_COLLECTIONS.recentlyAdded.type }, limit, offset);
-    if (virtualKind === 'recentlyPlayed') return getCollectionTracks({ ...collection, type: VIRTUAL_COLLECTIONS.recentlyPlayed.type }, limit, offset);
     if (virtualKind === 'favorites') return getCollectionTracks({ ...collection, type: VIRTUAL_COLLECTIONS.favorites.type }, limit, offset);
     if (virtualKind === 'randomMix') return getCollectionTracks({ ...collection, type: VIRTUAL_COLLECTIONS.randomMix.type }, limit, offset);
     throw new OnlineProviderError('unsupported', 'Unsupported Jellyfin collection type: ' + collection.type, 'jellyfin');

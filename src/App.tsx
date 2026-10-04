@@ -2551,7 +2551,11 @@ export default function App() {
             onLoadedMetadata={(e) => {
                 const audioElement = e.currentTarget;
                 if (!automix.isActiveDeck(audioElement)) return;
-                setDuration(audioElement.duration);
+                const mediaDuration = audioElement.duration;
+                const metadataDuration = (currentSong?.durationMs || 0) / 1000;
+                setDuration(Number.isFinite(mediaDuration) && mediaDuration > 0
+                    ? mediaDuration
+                    : Number.isFinite(metadataDuration) && metadataDuration > 0 ? metadataDuration : 0);
                 // While the picture is held, this deck is the track ARRIVING: its length and its
                 // position belong to a song the listener cannot see yet, and writing either here
                 // would snap the bar to zero mid-blend. `duration` above is still set because the

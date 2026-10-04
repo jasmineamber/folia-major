@@ -53,6 +53,29 @@ describe('jellyfinProvider', () => {
         expect(transport.getItems).not.toHaveBeenCalled();
     });
 
+    it('uses track album artwork for recent, favorite, and random overview collections', async () => {
+        transport.getItems.mockImplementation(async (query: Record<string, unknown>) => {
+            if (query.IncludeItemTypes === 'Audio') {
+                const kind = query.SortBy === 'DateCreated' ? 'recent' : query.Filters === 'IsFavorite' ? 'favorite' : 'random';
+                const item: JellyfinItemRecord = {
+                    Id: kind,
+                    Name: kind,
+                    Album: kind + ' album',
+                    AlbumId: kind + '-album',
+                    ImageTags: { Primary: kind + '-image' },
+                };
+                return { Items: [item], TotalRecordCount: 1 };
+            }
+            return { Items: [], TotalRecordCount: 0 };
+        });
+
+        const overview = await jellyfinProvider.jellyfin!.getHomeOverview();
+
+        expect(overview.recentlyAdded.coverUrl).toBe('http://server/image');
+        expect(overview.favorites.coverUrl).toBe('http://server/image');
+        expect(overview.randomMix.coverUrl).toBe('http://server/image');
+    });
+
     it('routes favorite changes using the Jellyfin item ID', async () => {
         const song = jellyfinProvider.normalizeSong({ Id: 'track-4', Name: 'Track' });
 

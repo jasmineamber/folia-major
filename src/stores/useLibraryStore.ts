@@ -18,12 +18,14 @@ type ProviderSwitchPending = {
 
 type LibraryState = {
     navidromeEnabled: boolean;
+    jellyfinEnabled: boolean;
     starredNavidromeSongIds: Set<string>;
     isProviderSyncing: boolean;
     /** Held while the confirm dialog for a provider switch is open; resolves the caller's promise. */
     providerSwitchPending: ProviderSwitchPending;
 
     setNavidromeEnabledState: React.Dispatch<React.SetStateAction<boolean>>;
+    setJellyfinEnabledState: React.Dispatch<React.SetStateAction<boolean>>;
     setStarredNavidromeSongIds: React.Dispatch<React.SetStateAction<Set<string>>>;
     setIsProviderSyncing: React.Dispatch<React.SetStateAction<boolean>>;
     setProviderSwitchPending: React.Dispatch<React.SetStateAction<ProviderSwitchPending>>;
@@ -33,13 +35,24 @@ const resolveNext = <T,>(next: React.SetStateAction<T>, previous: T): T => (
     typeof next === 'function' ? (next as (prev: T) => T)(previous) : next
 );
 
+const JELLYFIN_ENABLED_KEY = 'folia_jellyfin_enabled';
+const readJellyfinEnabled = (): boolean => {
+    try { return localStorage.getItem(JELLYFIN_ENABLED_KEY) === 'true'; } catch { return false; }
+};
+
 export const useLibraryStore = create<LibraryState>((set, get) => ({
     navidromeEnabled: isNavidromeEnabled(),
+    jellyfinEnabled: readJellyfinEnabled(),
     starredNavidromeSongIds: new Set(),
     isProviderSyncing: false,
     providerSwitchPending: null,
 
     setNavidromeEnabledState: (next) => set({ navidromeEnabled: resolveNext(next, get().navidromeEnabled) }),
+    setJellyfinEnabledState: (next) => {
+        const enabled = resolveNext(next, get().jellyfinEnabled);
+        try { localStorage.setItem(JELLYFIN_ENABLED_KEY, String(enabled)); } catch { /* Storage may be unavailable in private contexts. */ }
+        set({ jellyfinEnabled: enabled });
+    },
     setStarredNavidromeSongIds: (next) => set({ starredNavidromeSongIds: resolveNext(next, get().starredNavidromeSongIds) }),
     setIsProviderSyncing: (next) => set({ isProviderSyncing: resolveNext(next, get().isProviderSyncing) }),
     setProviderSwitchPending: (next) => set({ providerSwitchPending: resolveNext(next, get().providerSwitchPending) }),

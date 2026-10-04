@@ -132,7 +132,7 @@ export const omni = {
 
     getProviderSummaries(): OmniProviderSummary[] {
         const accounts = useOnlineProviderAccountStore.getState().accounts;
-        return listOnlineMusicProviders().map(provider => {
+        return listOnlineMusicProviders().filter(provider => provider.id !== 'jellyfin').map(provider => {
             const account = accounts[provider.id];
             return {
                 providerId: provider.id,

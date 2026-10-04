@@ -247,6 +247,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
     const isLocal = currentSong && !isNavidrome && (((currentSong as any).isLocal === true) || Boolean((currentSong as any).localRef?.songId));
     const playbackSourceRef = currentSong ? getPlaybackSourceRef(currentSong) : null;
     const isOnline = playbackSourceRef?.kind === 'online';
+    const isJellyfin = isOnline && playbackSourceRef.providerId === 'jellyfin';
     const bottomBarBottomPx = usePlayerBottomBarBottomPx();
     const panelMaxHeight = useTransform(
         bottomBarBottomPx,
@@ -279,6 +280,8 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
         tabs.splice(1, 0, { id: 'local' as PanelTab, label: t('localMusic.folder'), icon: FileAudio });
     } else if (isNavidrome) {
         tabs.splice(1, 0, { id: 'navi' as PanelTab, label: 'Navidrome', icon: Cloud });
+    } else if (isJellyfin) {
+        tabs.splice(1, 0, { id: 'onlineLyrics' as PanelTab, label: 'Jellyfin', icon: Cloud });
     } else if (isOnline) {
         tabs.splice(1, 0, { id: 'onlineLyrics' as PanelTab, label: t('localMusic.lyrics'), icon: FileText });
     }
@@ -936,6 +939,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                     {currentTab === 'onlineLyrics' && isOnline && currentSong && (
                                         <OnlineLyricsTab
                                             song={currentSong}
+                                            hasLyrics={hasLyrics}
                                             onlineLyricsState={onlineLyricsState}
                                             onImportLyrics={onImportOnlineLyrics}
                                             onChangeLyricsSource={onChangeOnlineLyricsSource}
@@ -946,6 +950,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                                             replayGainMode={replayGainMode}
                                             onChangeReplayGainMode={onChangeReplayGainMode}
                                             isDaylight={isDaylight}
+                                            isJellyfin={isJellyfin}
                                         />
                                     )}
                                 </div>

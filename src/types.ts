@@ -1242,6 +1242,7 @@ export interface SongResult {
 
 export interface OnlineLyricsState {
   lyricsSource: 'online' | 'imported';
+  jellyfinSkipOnlineMatch?: boolean;
   importedLyrics?: LyricData | null;
   importedLyricsName?: string | null;
   hasOnlineOverride?: boolean;

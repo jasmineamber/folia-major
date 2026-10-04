@@ -17,6 +17,7 @@ import { LyricPreviewPanel } from './LyricPreviewPanel';
 import { getProviderSongMetadata } from '../../services/onlineMusic/songMetadata';
 import { getSizedCoverUrl } from '../../utils/coverUrl';
 import { hasRenderableLyrics } from '../../utils/lyrics/validity';
+import { getPlaybackSourceRef } from '../../utils/appPlaybackGuards';
 
 // src/components/modal/OnlineLyricMatchModal.tsx
 
@@ -29,6 +30,8 @@ interface OnlineLyricMatchModalProps {
 
 const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onClose, onMatch, isDaylight }) => {
     const { t } = useTranslation();
+    const sourceRef = getPlaybackSourceRef(song);
+    const isJellyfin = sourceRef.kind === 'online' && sourceRef.providerId === 'jellyfin';
     const isMouseDownOnOverlayRef = useRef(false);
     const bgClass = isDaylight ? 'bg-white/90 border-white/20' : 'bg-zinc-900/95 border-white/10';
     const textPrimary = isDaylight ? 'text-zinc-900' : 'text-white';
@@ -163,6 +166,25 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
         }
     };
 
+    const handleSkipOnlineMatch = async () => {
+        setIsMatching(true);
+        try {
+            const previousState = await loadOnlineLyricsState(song);
+            await saveOnlineLyricsState(song, {
+                ...previousState,
+                lyricsSource: 'online',
+                jellyfinSkipOnlineMatch: true,
+                hasOnlineOverride: false,
+                onlineOverrideLyrics: null,
+            });
+            onMatch();
+        } catch (error) {
+            console.error('Failed to save Jellyfin lyric matching preference:', error);
+        } finally {
+            setIsMatching(false);
+        }
+    };
+
     const handleOverlayMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
         isMouseDownOnOverlayRef.current = event.target === event.currentTarget;
     };
@@ -181,8 +203,8 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
             >
                 <div className={`flex items-center justify-between px-6 py-5 border-b ${borderColor}`}>
                     <div>
-                        <h2 className={`text-lg font-semibold ${textPrimary}`}>{t('localMusic.matchLyrics')}</h2>
-                        <p className={`text-sm mt-1 ${textSecondary}`}>{song.name}</p>
+                        <h2 className={`text-lg font-semibold ${textPrimary}`}>{isJellyfin ? t('localMusic.matchLyrics') + ' (Jellyfin)' : t('localMusic.matchLyrics')}</h2>
+                        {!isJellyfin && <p className={`text-sm mt-1 ${textSecondary}`}>{song.name}</p>}
                     </div>
                     <button onClick={onClose} className={`p-2 rounded-full transition-colors ${closeBtnHover}`}>
                         <X size={18} className={textPrimary} />
@@ -348,17 +370,28 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
                     </div>
                 </div>
 
-                <div className={`px-6 py-5 border-t ${borderColor} flex justify-end gap-3`}>
-                    <button onClick={onClose} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cancelBtnBg} ${textPrimary}`}>
-                        {t('localMusic.cancel')}
-                    </button>
-                    <button
-                        onClick={() => void handleConfirm()}
-                        disabled={!selectedResult || isMatching}
-                        className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${searchBtnBg} disabled:opacity-50`}
-                    >
-                        {isMatching ? t('localMusic.matching') : t('options.save')}
-                    </button>
+                <div className={`px-6 py-5 border-t ${borderColor} flex items-center justify-between gap-3`}>
+                    {isJellyfin ? (
+                        <button
+                            onClick={() => void handleSkipOnlineMatch()}
+                            disabled={isMatching}
+                            className="px-4 py-2 rounded-xl text-sm font-medium text-red-400 border border-red-500/30 bg-red-500/5 hover:bg-red-500/10 disabled:opacity-50"
+                        >
+                            {t('localMusic.skipOnlineMatch')}
+                        </button>
+                    ) : <span />}
+                    <div className="flex justify-end gap-3">
+                        <button onClick={onClose} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${cancelBtnBg} ${textPrimary}`}>
+                            {t('localMusic.cancel')}
+                        </button>
+                        <button
+                            onClick={() => void handleConfirm()}
+                            disabled={!selectedResult || isMatching}
+                            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${searchBtnBg} disabled:opacity-50`}
+                        >
+                            {isMatching ? t('localMusic.matching') : t('options.save')}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

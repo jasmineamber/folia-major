@@ -9,7 +9,7 @@ import { ReplayGainInfo, SongResult, LyricData, OnlineLyricsState, type LyricPro
 import { migrateLyricDataRenderHints } from '../utils/lyrics/renderHints';
 import { isPureMusicLyricText } from '../utils/lyrics/pureMusic';
 import { autoMatchBestLyric } from '../utils/lyrics/autoMatchBestLyric';
-import { loadOnlineLyricsState, markOnlineLyricsPureMusic, resolveOnlineLyrics, saveOnlineLyricsState } from '../utils/onlineLyricsState';
+import { hasJellyfinServerLyrics, loadOnlineLyricsState, markOnlineLyricsPureMusic, resolveOnlineLyrics, saveOnlineLyricsState, shouldSkipJellyfinOnlineLyricMatch } from '../utils/onlineLyricsState';
 import type { AudioQualityPreference, MediaId } from '../types/onlineMusic';
 import { getPlaybackSourceRef } from '../utils/appPlaybackGuards';
 import { omni } from './onlineMusic/omni';
@@ -178,6 +178,9 @@ const prefetchSong = async (
         return;
     }
 
+    const storedLyricsState = sourceRef.providerId === 'jellyfin' ? await loadOnlineLyricsState(song) : null;
+    const skipJellyfinOnlineMatch = shouldSkipJellyfinOnlineLyricMatch(song, storedLyricsState);
+
     const songId = song.id;
     const songKey = getPrefetchSongKey(song);
 
@@ -189,7 +192,7 @@ const prefetchSong = async (
   const currentSettingsLyricSettings = useLyricSettingsStore.getState();
     const lyricPreferenceMatches = !currentSettingsLyricSettings.autoUseBestLyric
         || existing?.lyricPreferenceSource === currentSettingsLyricSettings.preferredAlternativeLyricSource;
-    if (existing && lyricPreferenceMatches && existing.audioUrl && isUrlValid(existing.audioUrlFetchedAt) && (existing.lyrics || existing.lyricRaw?.isPureMusic)) {
+    if (!skipJellyfinOnlineMatch && existing && lyricPreferenceMatches && existing.audioUrl && isUrlValid(existing.audioUrlFetchedAt) && (existing.lyrics || existing.lyricRaw?.isPureMusic)) {
         console.log(`[Prefetch] Already cached: ${song.name}`);
         touchPrefetchCacheEntry(songKey, existing);
         analyseForAutomix(song, existing.audioUrl);
@@ -205,9 +208,9 @@ const prefetchSong = async (
         audioUrlFetchedAt: existing?.audioUrlFetchedAt || 0,
         audioUrlQuality: existing?.audioUrlQuality || null,
         replayGain: existing?.replayGain ?? song.replayGain,
-        lyrics: existing?.lyrics || null,
-        lyricRaw: existing?.lyricRaw || null,
-        lyricPreferenceSource: existing?.lyricPreferenceSource || null,
+        lyrics: skipJellyfinOnlineMatch ? null : existing?.lyrics || null,
+        lyricRaw: skipJellyfinOnlineMatch ? null : existing?.lyricRaw || null,
+        lyricPreferenceSource: skipJellyfinOnlineMatch ? null : existing?.lyricPreferenceSource || null,
         coverUrl: existing?.coverUrl || null,
     };
 
@@ -242,7 +245,7 @@ const prefetchSong = async (
         try {
             // Check IndexedDB cache first
             const cachedLyrics = await getSongCacheWithLegacyMigration<LyricData>('lyric', song, migrateLyricDataRenderHints);
-            if (cachedLyrics) {
+            if (cachedLyrics && !skipJellyfinOnlineMatch) {
                 console.log(`[Prefetch] Lyrics in IndexedDB for: ${song.name}`);
                 data.lyrics = cachedLyrics;
                 // The same stamp the fetched path leaves below. Without it a track whose lyrics came
@@ -271,7 +274,7 @@ const prefetchSong = async (
                 let parsedLyrics = processed.lyrics;
                 let finalLyrics = parsedLyrics;
 
-                const onlineLyricsState = await loadOnlineLyricsState(song);
+                const onlineLyricsState = storedLyricsState ?? await loadOnlineLyricsState(song);
                 const resolvedLyrics = resolveOnlineLyrics(onlineLyricsState, parsedLyrics);
 
   const settingsAudioSettings = useAudioSettingsStore.getState();
@@ -279,7 +282,10 @@ const prefetchSong = async (
   const settingsLyricSettings = useLyricSettingsStore.getState();
                 const autoUseBest = settingsLyricSettings.autoUseBestLyric;
                 const preferredSource = settingsLyricSettings.preferredAlternativeLyricSource;
-                const shouldAutoMatch = autoUseBest && !onlineLyricsState?.hasOnlineOverride;
+                const shouldAutoMatch = autoUseBest
+                    && !onlineLyricsState?.hasOnlineOverride
+                    && !shouldSkipJellyfinOnlineLyricMatch(song, onlineLyricsState)
+                    && !hasJellyfinServerLyrics(song, parsedLyrics);
 
                 if (shouldAutoMatch) {
                     try {
@@ -307,6 +313,7 @@ const prefetchSong = async (
                             const overrideState: OnlineLyricsState = {
                                 lyricsSource: 'online',
                                 matchedSongId: bestMatch.id,
+                                matchedIsPureMusic: false,
                                 hasOnlineOverride: true,
                                 onlineOverrideLyrics: bestMatch.lyrics,
                                 matchedLyricsSource: bestMatch.source,

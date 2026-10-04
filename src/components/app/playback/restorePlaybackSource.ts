@@ -23,7 +23,7 @@ import { getLocalCoverAssetUrl } from '../../../services/localCoverAssetUrl';
 import { isPureMusicLyricText } from '../../../utils/lyrics/pureMusic';
 import { migrateLyricDataRenderHints } from '../../../utils/lyrics/renderHints';
 import { resolveLocalSongLyrics } from '../../../utils/lyrics/localSongLyrics';
-import { loadOnlineLyricsState, resolveOnlineLyrics } from '../../../utils/onlineLyricsState';
+import { loadOnlineLyricsState, resolveOnlineLyrics, shouldSkipJellyfinOnlineLyricMatch } from '../../../utils/onlineLyricsState';
 import type { AudioQualityPreference, MediaId } from '../../../types/onlineMusic';
 import { omni } from '../../../services/onlineMusic/omni';
 import { getCachedSongCoverUrl, getSongCacheWithLegacyMigration } from '../../../services/onlineMusic/resourceCache';
@@ -244,6 +244,21 @@ export const restorePlaybackSourceForSong = async (
         void persistLastPlaybackCache?.(restoredSong, restoredQueue);
     }
 
+    const songProviderId = song.sourceRef?.kind === 'online' ? song.sourceRef.providerId : null;
+    const effectiveUserId = songProviderId
+        ? (useOnlineProviderAccountStore.getState().accounts[songProviderId]?.user?.id ?? userId)
+        : userId;
+
+    if (shouldSkipJellyfinOnlineLyricMatch(song, onlineLyricsState)) {
+        const providerLyrics = await omni.getLyrics(song, { userId: effectiveUserId });
+        setCurrentSong(prev => {
+            if (!prev || !isSamePlaybackSong(prev, song)) return prev;
+            return { ...prev, isPureMusic: providerLyrics.isPureMusic };
+        });
+        setLyrics(providerLyrics.lyrics);
+        return true;
+    }
+
     const cachedLyrics = await getSongCacheWithLegacyMigration<LyricData>('lyric', song, migrateLyricDataRenderHints);
     const restoredPreferredLyrics = resolveOnlineLyrics(onlineLyricsState, cachedLyrics);
     if (restoredPreferredLyrics) {
@@ -261,10 +276,6 @@ export const restorePlaybackSourceForSong = async (
         return true;
     }
 
-    const songProviderId = song.sourceRef?.kind === 'online' ? song.sourceRef.providerId : null;
-    const effectiveUserId = songProviderId
-        ? (useOnlineProviderAccountStore.getState().accounts[songProviderId]?.user?.id ?? userId)
-        : userId;
     const processed = await omni.getLyrics(song, { userId: effectiveUserId });
     const resolvedLyrics = resolveOnlineLyrics(onlineLyricsState, processed.lyrics);
     setCurrentSong(prev => {

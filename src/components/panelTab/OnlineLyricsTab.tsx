@@ -1,17 +1,19 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Search, RotateCcw } from 'lucide-react';
+import { Cloud, FileText, RefreshCw, Search, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { OnlineLyricsState, ReplayGainMode, SongResult } from '../../types';
 import LyricTimelineOffsetControl from './LyricTimelineOffsetControl';
 import LyricFileButton from './LyricFileButton';
 import ReplayGainControl from './ReplayGainControl';
 import { getLyricProviderLabel, getSongNativeLyricProviderSource } from '../../utils/lyrics/lyricSourceLabels';
+import { jellyfinSongId } from '../../services/onlineMusic/jellyfinNormalize';
 
 // src/components/panelTab/OnlineLyricsTab.tsx
 
 interface OnlineLyricsTabProps {
     song: SongResult;
+    hasLyrics: boolean;
     onlineLyricsState: OnlineLyricsState | null;
     onImportLyrics: (content: string, fileName: string) => void;
     onChangeLyricsSource: (source: 'online' | 'imported') => void;
@@ -22,10 +24,12 @@ interface OnlineLyricsTabProps {
     replayGainMode: ReplayGainMode;
     onChangeReplayGainMode: (mode: ReplayGainMode) => void;
     isDaylight: boolean;
+    isJellyfin?: boolean;
 }
 
 const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
     song,
+    hasLyrics,
     onlineLyricsState,
     onImportLyrics,
     onChangeLyricsSource,
@@ -36,6 +40,7 @@ const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
     replayGainMode,
     onChangeReplayGainMode,
     isDaylight,
+    isJellyfin = false,
 }) => {
     const { t } = useTranslation();
 
@@ -65,6 +70,14 @@ const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
             : [{ key: 'online' as const, label: onlineSourceLabel }]),
         [hasImportedLyrics, onlineSourceLabel, t],
     );
+    const jellyfinId = isJellyfin ? jellyfinSongId(song) : null;
+    const lyricsSourceLabel = activeSource === 'imported' && hasImportedLyrics
+        ? t('localMusic.statusImported')
+        : isJellyfin && onlineLyricsState?.hasOnlineOverride
+            ? onlineSourceLabel
+            : isJellyfin
+                ? hasLyrics ? t('navidrome.server') : t('localMusic.statusNone')
+                : onlineSourceLabel;
 
     const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -89,6 +102,22 @@ const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
             animate={{ opacity: 1 }}
             className="flex flex-col gap-4 pt-0 px-2"
         >
+            {isJellyfin && (
+                <div className="space-y-3">
+                    <h3 className="text-sm font-semibold opacity-50 uppercase tracking-wider flex items-center gap-2">
+                        <Cloud size={14} /> Jellyfin Server
+                    </h3>
+                    <div className="bg-white/5 rounded-xl p-3 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="opacity-60">Song ID</span>
+                            <span className="font-mono text-xs opacity-80 truncate max-w-[150px]" title={jellyfinId ?? undefined}>
+                                {jellyfinId ?? '—'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <ReplayGainControl
                 values={song.replayGain}
                 mode={replayGainMode}
@@ -100,9 +129,10 @@ const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                         <label className="text-[12px] font-bold opacity-40 uppercase tracking-widest flex items-center gap-1.5">
+                            <FileText size={14} />
                             {t('localMusic.lyrics')}
                         </label>
-                        {hasOverride && (
+                        {!isJellyfin && hasOverride && (
                             <button
                                 onClick={onClearOnlineLyricsState}
                                 className={`p-1 rounded-md transition-all opacity-40 hover:opacity-100 ${isDaylight ? 'hover:bg-black/5' : 'hover:bg-white/5'}`}
@@ -120,21 +150,23 @@ const OnlineLyricsTab: React.FC<OnlineLyricsTabProps> = ({
                         />
                         <button
                             onClick={onMatchOnlineLyrics}
-                            className={`p-1 rounded-md transition-all opacity-40 hover:opacity-100 ${isDaylight ? 'hover:bg-black/5' : 'hover:bg-white/5'}`}
+                            className={isJellyfin
+                                ? 'px-3 py-1 bg-white/10 hover:bg-white/20 active:bg-white/30 transition-colors rounded-lg text-xs font-medium flex items-center gap-1.5'
+                                : `p-1 rounded-md transition-all opacity-40 hover:opacity-100 ${isDaylight ? 'hover:bg-black/5' : 'hover:bg-white/5'}`}
                             title={t('localMusic.matchOnline')}
                         >
-                            <Search size={14} />
+                            {isJellyfin ? <><RefreshCw size={12} />{t('localMusic.matchOnline')}</> : <Search size={14} />}
                         </button>
                     </div>
                 </div>
 
-                {availableSources.length === 1 ? (
+                {isJellyfin || availableSources.length === 1 ? (
                     <div className={`flex items-center justify-between ${isDaylight ? 'bg-black/5' : 'bg-white/5'} rounded-lg p-2 pl-3`}>
                         <span className="text-[11px] opacity-60">
                             {t('localMusic.lyricsSource')}
                         </span>
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${activeTabBg}`}>
-                            {availableSources[0].label}
+                            {lyricsSourceLabel}
                         </span>
                     </div>
                 ) : (

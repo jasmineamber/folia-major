@@ -3,7 +3,7 @@ import type { LyricData, ReplayGainInfo, SongResult, UnifiedSong } from '../type
 // src/types/onlineMusic.ts
 
 export type MediaId = string | number;
-export type OnlineProviderId = 'netease' | (string & {});
+export type OnlineProviderId = 'netease' | 'jellyfin' | (string & {});
 export type AudioQualityPreference = 'standard' | 'high' | 'lossless' | 'hires';
 export type ProviderCatalogEntityKind = 'album' | 'artist' | 'playlist';
 
@@ -338,6 +338,59 @@ export interface OnlineMutationProvider {
     subscribeAlbum?(id: MediaId, subscribed: boolean): Promise<void>;
 }
 
+export interface JellyfinLibrary {
+    id: string;
+    name: string;
+}
+
+export interface JellyfinConnectionState {
+    serverUrl: string;
+    username: string;
+    userId: string;
+    selectedLibraryIds: string[];
+}
+
+export interface JellyfinHomeOverview {
+    albums: ProviderCollection[];
+    artists: ProviderCollection[];
+    recentlyAdded: ProviderCollection;
+    recentlyPlayed: ProviderCollection;
+    favorites: ProviderCollection;
+    randomMix: ProviderCollection;
+    playlists: ProviderCollection[];
+}
+
+export interface JellyfinPlaylistCreateOptions {
+    name: string;
+    songs?: SongResult[];
+}
+
+export interface JellyfinPlaybackEvent {
+    kind: 'start' | 'progress' | 'stopped';
+    positionSeconds: number;
+    isPaused?: boolean;
+    playSessionId?: string;
+    mediaSourceId?: string;
+    playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode';
+}
+
+/** Jellyfin-specific operations exposed only through the Omni facade. */
+export interface OnlineJellyfinProvider {
+    getConnection(): JellyfinConnectionState | null;
+    login(serverUrl: string, username: string, password: string): Promise<JellyfinConnectionState>;
+    logout(): Promise<void>;
+    getLibraries(): Promise<JellyfinLibrary[]>;
+    setSelectedLibraries(libraryIds: string[]): Promise<void>;
+    getHomeOverview(): Promise<JellyfinHomeOverview>;
+    createPlaylist(name: string, songs?: SongResult[]): Promise<ProviderCollection>;
+    renamePlaylist(playlist: ProviderCollection, name: string): Promise<void>;
+    deletePlaylist(playlist: ProviderCollection): Promise<void>;
+    searchSongs(query: string, limit: number, offset: number): Promise<ProviderPage<UnifiedSong>>;
+    getCollectionTracks(collection: ProviderCollection, limit: number, offset: number): Promise<ProviderPage<UnifiedSong>>;
+    reportPlaybackEvent(song: SongResult, event: JellyfinPlaybackEvent): Promise<void>;
+    subscribeConnection?(listener: () => void): () => void;
+}
+
 export interface OnlineMusicProvider {
     id: OnlineProviderId;
     displayName: string;
@@ -358,6 +411,7 @@ export interface OnlineMusicProvider {
     catalog?: OnlineCatalogProvider;
     recommendations?: OnlineRecommendationProvider;
     mutations?: OnlineMutationProvider;
+    jellyfin?: OnlineJellyfinProvider;
 }
 
 // Public canonical contract consumed through the omni facade. Provider-prefixed

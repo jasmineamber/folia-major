@@ -54,6 +54,19 @@ describe('PlaybackListenTracker', () => {
         expect(tracker.settle(4000)).toBeNull();
     });
 
+    it('does not count a short forward seek as listened time', () => {
+        const tracker = new PlaybackListenTracker();
+        tracker.start(session, 0);
+        play(tracker, 40, 0, 0);
+
+        tracker.resetProgressAnchor();
+        tracker.handleProgress(41.5, 41_500);
+        const now = play(tracker, 5, 41.5, 41_500);
+
+        expect(tracker.getListenedSeconds()).toBeCloseTo(45, 5);
+        expect(tracker.settle(now)).toMatchObject({ playedSeconds: 45 });
+    });
+
     it('credits only the seconds replayed after a rewind, never the rewind itself', () => {
         const tracker = new PlaybackListenTracker();
         tracker.start(session, 0);

@@ -91,6 +91,13 @@ export interface GridViewSourceActions {
         onDeletePlaylist?: (playlistId: string) => Promise<void> | void;
         onRemovePlaylistSongs?: (playlistId: string, songIndexes: number[]) => Promise<void> | void;
     };
+    jellyfin?: {
+        availablePlaylists?: Array<{ id: string | number; name: string; description?: string; }>;
+        onAddToPlaylist?: (playlistId: string | number, songs: SongResult[]) => Promise<void> | void;
+        onCreatePlaylist?: (name: string, songs: SongResult[]) => Promise<void> | void;
+        onRenamePlaylist?: (playlistId: string, name: string) => Promise<void> | void;
+        onDeletePlaylist?: (playlistId: string) => Promise<void> | void;
+    };
 }
 
 interface GridViewProps {
@@ -495,9 +502,14 @@ export const GridView: React.FC<GridViewProps> = ({
     const isLocalPlaylistCollection = isLocalCollection && collection?.type === 'playlist' && Boolean(collection?.playlistId) && !collection?.isVirtual;
     const isLocalEntityCollection = isLocalCollection && Boolean(collection?.entityId);
     const isNavidromePlaylistCollection = isNavidromeCollection && collection?.type === 'playlist' && Boolean(collection?.editable);
+    const isJellyfinCollection = collectionSource === 'online' && collection?.providerId === 'jellyfin';
+    const isJellyfinPlaylistCollection = isJellyfinCollection && collection?.type === 'playlist';
     const canAddNavidromeToPlaylist = isNavidromeCollection
         && collection?.type !== 'playlist'
         && Boolean(sourceActions?.navidrome?.onAddToPlaylist || sourceActions?.navidrome?.onCreatePlaylist);
+    const canAddJellyfinToPlaylist = isJellyfinCollection
+        && collection?.type !== 'playlist'
+        && Boolean(sourceActions?.jellyfin?.onAddToPlaylist || sourceActions?.jellyfin?.onCreatePlaylist);
     const localSongsById = useMemo(() => new Map(localSongs?.map(song => [song.id, song])), [localSongs]);
     // 专辑归属以本地曲库的专辑实体为准，不用文件里的专辑标签字面值：
     // 用户重命名或合并实体后，显示轨道已经带上了实体的 entityId 和 displayName。
@@ -655,6 +667,8 @@ export const GridView: React.FC<GridViewProps> = ({
                     await sourceActions?.local?.onRenamePlaylist?.(collection.playlistId, nextTitle);
                 } else if (isNavidromePlaylistCollection) {
                     await sourceActions?.navidrome?.onRenamePlaylist?.(String(collection.id), nextTitle);
+                } else if (isJellyfinPlaylistCollection) {
+                    await sourceActions?.jellyfin?.onRenamePlaylist?.(String(collection.id), nextTitle);
                 }
                 collection.name = nextTitle;
             }
@@ -668,6 +682,7 @@ export const GridView: React.FC<GridViewProps> = ({
         isEditMode,
         isLocalPlaylistCollection,
         isNavidromePlaylistCollection,
+        isJellyfinPlaylistCollection,
         sourceActions,
         title,
     ]);
@@ -683,6 +698,8 @@ export const GridView: React.FC<GridViewProps> = ({
                 await sourceActions?.local?.onDeletePlaylist?.(collection.playlistId);
             } else if (isNavidromePlaylistCollection) {
                 await sourceActions?.navidrome?.onDeletePlaylist?.(String(collection.id));
+            } else if (isJellyfinPlaylistCollection) {
+                await sourceActions?.jellyfin?.onDeletePlaylist?.(String(collection.id));
             }
             onBack();
         } finally {
@@ -693,6 +710,7 @@ export const GridView: React.FC<GridViewProps> = ({
         isLocalFolderCollection,
         isLocalPlaylistCollection,
         isNavidromePlaylistCollection,
+        isJellyfinPlaylistCollection,
         onBack,
         sourceActions,
     ]);
@@ -1002,6 +1020,7 @@ export const GridView: React.FC<GridViewProps> = ({
         || (isDailyRecommendationsCollection && !selectedDailyRecommendationDate)
         || isLocalPlaylistCollection
         || isNavidromePlaylistCollection
+        || (isJellyfinPlaylistCollection && collection?.isOwned === true && canEditOnlineCollectionTracks)
     );
 
     // An owned online playlist edits in place; a local or Navidrome one commits a rename on the way
@@ -2201,7 +2220,7 @@ export const GridView: React.FC<GridViewProps> = ({
                             {/* Title & Creator */}
                             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain custom-scrollbar pr-1 space-y-4 text-left min-w-0">
                                 <div>
-                                    {(isLocalPlaylistCollection || isNavidromePlaylistCollection) && isEditMode ? (
+                                    {(isLocalPlaylistCollection || isNavidromePlaylistCollection || isJellyfinPlaylistCollection) && isEditMode ? (
                                         <input
                                             value={editableTitle}
                                             onChange={(event) => setEditableTitle(event.target.value)}
@@ -2355,7 +2374,7 @@ export const GridView: React.FC<GridViewProps> = ({
                                         ? t('playlist.addFilteredTracksToQueue', { count: contextActionTracks.length })
                                         : t('navidrome.addToQueue')}
                                 </button>
-                                {canAddNavidromeToPlaylist && (
+                                {(canAddNavidromeToPlaylist || canAddJellyfinToPlaylist) && (
                                     <button
                                         onClick={() => setIsPlaylistPickerOpen(true)}
                                         disabled={playableTracks.length === 0 || isSourceActionPending}
@@ -2441,7 +2460,7 @@ export const GridView: React.FC<GridViewProps> = ({
                                         })}
                                     </button>
                                 )}
-                                {(isLocalFolderCollection || isLocalPlaylistCollection || isNavidromePlaylistCollection) && (
+                                {(isLocalFolderCollection || isLocalPlaylistCollection || isNavidromePlaylistCollection || (isJellyfinPlaylistCollection && collection?.isOwned === true && collection?.providerData?.canDelete === true)) && (
                                     <button
                                         onClick={() => isLocalFolderCollection ? setIsDeleteFolderOpen(true) : void handleDeleteSourceCollection()}
                                         disabled={isSourceActionPending}
@@ -2461,10 +2480,16 @@ export const GridView: React.FC<GridViewProps> = ({
             <PlaylistSelectionDialog
                 isOpen={isPlaylistPickerOpen}
                 title={t('localMusic.addToPlaylist')}
-                playlists={sourceActions?.navidrome?.availablePlaylists || []}
+                playlists={canAddJellyfinToPlaylist
+                    ? sourceActions?.jellyfin?.availablePlaylists || []
+                    : sourceActions?.navidrome?.availablePlaylists || []}
                 onClose={() => setIsPlaylistPickerOpen(false)}
                 onSelect={(playlistId) => {
-                    void handleAddNavidromeCollectionToPlaylist(playlistId);
+                    if (canAddJellyfinToPlaylist) {
+                        void sourceActions?.jellyfin?.onAddToPlaylist?.(playlistId, playableTracks);
+                    } else {
+                        void handleAddNavidromeCollectionToPlaylist(playlistId);
+                    }
                     setIsPlaylistPickerOpen(false);
                 }}
                 onCreate={() => setIsCreatePlaylistOpen(true)}
@@ -2478,7 +2503,12 @@ export const GridView: React.FC<GridViewProps> = ({
                 confirmLabel={t('localMusic.createPlaylist')}
                 onClose={() => setIsCreatePlaylistOpen(false)}
                 onConfirm={(name) => {
-                    void handleCreateNavidromePlaylist(name);
+                    if (canAddJellyfinToPlaylist) {
+                        void sourceActions?.jellyfin?.onCreatePlaylist?.(name, playableTracks);
+                        setIsCreatePlaylistOpen(false);
+                    } else {
+                        void handleCreateNavidromePlaylist(name);
+                    }
                 }}
                 isDaylight={isDaylight}
             />

@@ -115,6 +115,10 @@ export const useNeteaseScrobbleReporter = ({
         if (!audioElement) return;
 
         const handleTimeUpdate = () => {
+            if (audioElement.seeking) {
+                tracker.resetProgressAnchor();
+                return;
+            }
             if (audioElement.paused || audioElement.ended) return;
             if (tracker.handleProgress(audioElement.currentTime || 0).restarted) {
                 // Loop-one, or a replay by hand: bank the first listen before counting the second.
@@ -124,6 +128,7 @@ export const useNeteaseScrobbleReporter = ({
             }
         };
 
+        const handleSeeking = () => tracker.resetProgressAnchor();
         const handleEnded = () => settle();
 
         // No `pagehide` settle. `sendPlaybackReport` reaches the network through an async hop
@@ -131,10 +136,12 @@ export const useNeteaseScrobbleReporter = ({
         // destroyed renderer - it would clear the session, lose the listen to a bfcache restore, and
         // still send nothing. The track playing when the app closes goes unreported, which is the
         // safe direction, and saying so beats a listener that promises what it cannot do.
+        audioElement.addEventListener('seeking', handleSeeking);
         audioElement.addEventListener('timeupdate', handleTimeUpdate);
         audioElement.addEventListener('ended', handleEnded);
 
         return () => {
+            audioElement.removeEventListener('seeking', handleSeeking);
             audioElement.removeEventListener('timeupdate', handleTimeUpdate);
             audioElement.removeEventListener('ended', handleEnded);
         };

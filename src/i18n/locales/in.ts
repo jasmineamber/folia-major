@@ -2832,6 +2832,26 @@ export default {
     "coverCacheFailed": "Metadata disimpan, tetapi sampul tidak dapat di-cache. URL online tetap akan digunakan bila tersedia.",
     "lyricsNotAppliedOtherSaved": "Lirik tidak diterapkan; pilihan lain disimpan."
   },
+  "jellyfin": {
+    "settings": "Jellyfin",
+    "serverUrl": "URL Server",
+    "username": "Nama Pengguna",
+    "password": "Kata Sandi",
+    "connect": "Hubungkan",
+    "connecting": "Menghubungkan...",
+    "retry": "Coba lagi",
+    "disconnect": "Putuskan",
+    "selectLibraries": "Pilih perpustakaan musik",
+    "noLibraries": "Tidak ada perpustakaan musik ditemukan.",
+    "noLibrarySelected": "Pilih satu atau beberapa perpustakaan musik.",
+    "corsHint": "Untuk Web, izinkan origin Folia di Jellyfin Dashboard > Networking > CORS Hosts.",
+    "artists": "Artis",
+    "recentlyAdded": "Baru Ditambahkan",
+    "recentlyPlayed": "Baru Diputar",
+    "favorites": "Favorit",
+    "random": "Acak",
+    "emptySection": "Belum ada yang ditampilkan."
+  },
   "navidrome": {
     "title": "Navi",
     "enable": "Hubungkan Navidrome (Eksperimental)",

@@ -18,6 +18,7 @@ import SettingsSectionHeading from './navigation/SettingsSectionHeading';
 import { setStatusMessage } from '../../../stores/useStatusMessageStore';
 import { useThemeSettingsStore } from '../../../stores/useThemeSettingsStore';
 import { useStageSettingsStore } from '../../../stores/useStageSettingsStore';
+import JellyfinSettingsSection from './JellyfinSettingsSection';
 
 // src/components/modal/settings/IntegrationSettingsSubview.tsx
 // Integration settings for Discord, Stage, Now Playing, OBS, and Navidrome.
@@ -886,6 +887,15 @@ const IntegrationSettingsSubview: React.FC<IntegrationSettingsSubviewProps> = ({
                         </div>
                     )}
                 </div>
+            </SettingsAnchor>
+            <SettingsAnchor anchorId="jellyfin" label="Jellyfin">
+                <JellyfinSettingsSection
+                    successBgColor={successBgColor}
+                    successTextColor={successTextColor}
+                    errorBgColor={errorBgColor}
+                    errorTextColor={errorTextColor}
+                    settingsCardClass={settingsCardClass}
+                />
             </SettingsAnchor>
         </>
     );

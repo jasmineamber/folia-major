@@ -222,7 +222,28 @@ export function useLibraryPlaybackController({
         const prefetched = getPrefetchedData(onlineSong, audioQuality);
         if (prefetched?.lyrics) return prefetched.lyrics;
 
-        return (await omni.getLyrics(onlineSong, { userId })).lyrics ?? fallbackLyrics;
+        const providerLyrics = (await omni.getLyrics(onlineSong, { userId })).lyrics;
+        if (providerLyrics) return providerLyrics;
+
+        const source = getPlaybackSourceRef(onlineSong);
+        if (source.kind === 'online' && source.providerId === 'jellyfin') {
+            try {
+                const metadata = getProviderSongMetadata(onlineSong);
+                const match = await autoMatchBestLyric(
+                    onlineSong.name,
+                    metadata.artists.map(artist => artist.name).filter(Boolean).join(', '),
+                    metadata.durationMs,
+                    {
+                        album: metadata.album?.name,
+                        preferredSource: useLyricSettingsStore.getState().preferredAlternativeLyricSource,
+                    },
+                );
+                if (match && !('isPureMusic' in match)) return match.lyrics;
+            } catch (error) {
+                console.warn('[Jellyfin] Native lyrics were unavailable and Folia lyric matching failed:', error);
+            }
+        }
+        return fallbackLyrics;
     }, [audioQuality, lyrics, userId]);
 
     const resolveOnlineSongLyricsState = useCallback(async (

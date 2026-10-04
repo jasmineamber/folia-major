@@ -9,6 +9,7 @@ import { SongResult, LocalSong, LocalPlaylist, LocalLibraryGroup, Theme, PlayerS
 import { getNavidromeConfig, navidromeApi } from '../services/navidromeService';
 import LocalGrid3DView from './app/home/LocalGrid3DView';
 import NavidromeGrid3DView from './app/home/NavidromeGrid3DView';
+import JellyfinGrid3DView from './app/home/JellyfinGrid3DView';
 import DesktopGrid3DSurface from './folia-grid/DesktopGrid3DSurface';
 import {
     createOnlineGridViewCollection,
@@ -921,6 +922,17 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                         onSelect={selectProvider}
                     />
                 ) : isOnlineTab ? (
+                    activeProviderId === 'jellyfin' ? (
+                        <JellyfinGrid3DView
+                            theme={theme}
+                            isDaylight={isDaylight}
+                            isInteractive={isInteractive}
+                            hasFloatingPlayer={Boolean(currentTrack)}
+                            userId={String(activeUser?.id || '')}
+                            selectedLibraryCount={omni.getJellyfinConnection()?.selectedLibraryIds.length || 0}
+                            onOpenGridView={onOpenGridView}
+                        />
+                    ) : (
                     <DesktopGrid3DSurface
                         focusMemoryScope={JSON.stringify(['online', activeProviderId, activeUser?.id ?? null, homeViewTab])}
                         title={
@@ -943,6 +955,7 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
                         hasFloatingPlayer={Boolean(currentTrack)}
                         playlistVisibilityScope={`online:${activeProviderId}`}
                     />
+                    )
                 ) : homeViewTab === 'local' ? (
                     <div className="w-full h-full flex-1">
                         <LocalGrid3DView

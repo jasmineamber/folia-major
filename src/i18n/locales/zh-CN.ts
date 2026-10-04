@@ -2946,6 +2946,26 @@ export default {
     "coverCacheFailed": "元数据已保存，但封面缓存失败；在线地址可用时仍会继续显示封面。",
     "lyricsNotAppliedOtherSaved": "歌词未应用，其他选择已保存。"
   },
+  "jellyfin": {
+    "settings": "Jellyfin",
+    "serverUrl": "服务器地址",
+    "username": "用户名",
+    "password": "密码",
+    "connect": "连接",
+    "connecting": "连接中...",
+    "retry": "重试",
+    "disconnect": "断开连接",
+    "selectLibraries": "选择音乐库",
+    "noLibraries": "未找到音乐库。",
+    "noLibrarySelected": "请选择一个或多个音乐库进行浏览。",
+    "corsHint": "Web 版需要在 Jellyfin 控制台 > 网络 > CORS 主机中允许 Folia 的来源地址。",
+    "artists": "艺术家",
+    "recentlyAdded": "最近添加",
+    "recentlyPlayed": "最近播放",
+    "favorites": "收藏",
+    "random": "随机播放",
+    "emptySection": "这里暂时没有内容。"
+  },
   "navidrome": {
     "title": "Navi",
     "enable": "连接Navidrome (实验性)",
